@@ -2436,11 +2436,41 @@
       netDiaAnterior:0, vopDia:0, netDia:0, netAcumulado:0
     };
 
+    // Carrega saldos mensais de cada agência para preencher o quadro mensal
+    const saldosStore = JSON.parse(lsGetItem(SALDOS_KEY) || '{}');
+
     const agencias = AGENCIAS_LIST.map(ag => {
+      const saldos = saldosStore[ag] || {};
       if (byAgency[ag]) {
         const r = byAgency[ag];
         const netDiaAnt = Number(r.netDiaAnterior) || 0;
-        return { ...r, agency: ag, netAcumulado: netDiaAnt + (Number(r.netDia)||0), enviado: true };
+        return {
+          ...zero,
+          // Saldos mensais do banco
+          metaVop:       Number(saldos.metaVopInicial) || Number(r.metaVop)      || 0,
+          descInicial:   Number(saldos.descInicial)    || Number(r.descInicial)   || 0,
+          quenteInicial: Number(saldos.quenteInicial)  || Number(r.quenteInicial) || 0,
+          arvInicial:    Number(saldos.arvInicial)      || Number(r.arvInicial)    || 0,
+          liqInicial:    Number(saldos.liqInicial)      || Number(r.liqInicial)    || 0,
+          // Dados do lançamento diário
+          ...r,
+          agency: ag,
+          netAcumulado: netDiaAnt + (Number(r.netDia)||0),
+          enviado: true
+        };
+      }
+      // Agência não enviou hoje, mas mostra saldos mensais se existirem
+      if (Object.keys(saldos).length > 0) {
+        return {
+          ...zero,
+          agency: ag,
+          metaVop:       Number(saldos.metaVopInicial) || 0,
+          descInicial:   Number(saldos.descInicial)    || 0,
+          quenteInicial: Number(saldos.quenteInicial)  || 0,
+          arvInicial:    Number(saldos.arvInicial)      || 0,
+          liqInicial:    Number(saldos.liqInicial)      || 0,
+          enviado: false
+        };
       }
       return { ...zero, agency: ag, enviado: false };
     });
@@ -2485,12 +2515,12 @@
         .catch(() => {
           // Fallback para localStorage
           renderPainel(montarPainelLocal(date));
-          document.getElementById('last-update').textContent = 'Dados locais — ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+          document.getElementById('last-update').textContent = 'Banco de dados — ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
         });
     } else {
       // Usa localStorage diretamente
       renderPainel(montarPainelLocal(date));
-            document.getElementById('last-update').textContent = 'Dados locais — ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+            document.getElementById('last-update').textContent = 'Banco de dados — ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
     }
   }
 
