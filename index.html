@@ -851,38 +851,44 @@
     _saveTimers[key] = setTimeout(() => supaSet(key, _memStore[key]), 300);
   }
 
-  // ── Escreve no Supabase com upsert real ──
-  async function supaSet(key, value, retries = 3) {
+  // ── Escreve no Supabase: tenta PATCH, se não existir faz POST ──
+  async function supaSet(key, value) {
     setDbStatus('syncing', 'Salvando...');
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const res = await fetch(`${SUPA_URL}/rest/v1/app_storage`, {
-          method: 'POST',
-          headers: supaHeaders({
-            'Prefer': 'resolution=merge-duplicates,return=minimal'
-          }),
-          body: JSON.stringify({ chave: key, valor: value, atualizado_em: new Date().toISOString() })
-        });
-        if (res.ok || res.status === 201) {
+    try {
+      // 1. Tenta atualizar registro existente (PATCH)
+      const patch = await fetch(
+        `${SUPA_URL}/rest/v1/app_storage?chave=eq.${encodeURIComponent(key)}`,
+        {
+          method: 'PATCH',
+          headers: supaHeaders({ 'Prefer': 'return=representation', 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ valor: value, atualizado_em: new Date().toISOString() })
+        }
+      );
+      if (patch.ok) {
+        const updated = await patch.json();
+        if (updated && updated.length > 0) {
+          // PATCH atualizou com sucesso
           setDbStatus('online', '🟢 Online');
           return;
         }
-        if (res.status === 429 || res.status >= 500) {
-          await new Promise(r => setTimeout(r, attempt * 800));
-          continue;
+        // Nenhuma linha afetada — registro não existe, faz INSERT
+        const post = await fetch(`${SUPA_URL}/rest/v1/app_storage`, {
+          method: 'POST',
+          headers: supaHeaders({ 'Prefer': 'return=minimal', 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ chave: key, valor: value, atualizado_em: new Date().toISOString() })
+        });
+        if (post.ok || post.status === 201) {
+          setDbStatus('online', '🟢 Online');
+          return;
         }
-        // Log do erro real para debug
-        const errText = await res.text().catch(() => '');
-        console.error('supaSet HTTP', res.status, errText);
-        throw new Error('HTTP ' + res.status);
-      } catch(e) {
-        if (attempt === retries) {
-          setDbStatus('offline', '🔴 Offline');
-          console.error('supaSet falhou após', retries, 'tentativas:', key, e);
-        } else {
-          await new Promise(r => setTimeout(r, attempt * 600));
-        }
+        const errText = await post.text().catch(() => '');
+        throw new Error('POST ' + post.status + ' ' + errText);
       }
+      const errText = await patch.text().catch(() => '');
+      throw new Error('PATCH ' + patch.status + ' ' + errText);
+    } catch(e) {
+      setDbStatus('offline', '🔴 Erro ao salvar');
+      console.error('supaSet erro:', key, e);
     }
   }
 
