@@ -863,11 +863,10 @@
   // ═══════════════════════════════════════════════════════
   const SUPA_URL     = 'https://umiwqmslqalanjwupdlh.supabase.co';
   const SUPA_KEY     = 'sb_publishable_JCqMW5zDWeHZdEZ9CtjEhw_bt5fjhyO';
-  const SUPA_SECRET  = 'sb_secret_bm58c1IhY6aLG83uuXJ0Iw_91_KdmOH';
   const SUPA_HEADERS = {
     'Content-Type': 'application/json',
     'apikey': SUPA_KEY,
-    'Authorization': `Bearer ${SUPA_SECRET}`,
+    'Authorization': `Bearer ${SUPA_KEY}`,
     'Prefer': 'resolution=merge-duplicates'
   };
 
@@ -911,7 +910,7 @@
       const res = await fetch(`${SUPA_URL}/rest/v1/app_storage?select=chave,valor`, {
         headers: {
           'apikey': SUPA_KEY,
-          'Authorization': `Bearer ${SUPA_SECRET}`
+          'Authorization': `Bearer ${SUPA_KEY}`
         }
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
