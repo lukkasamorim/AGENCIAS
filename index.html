@@ -2551,24 +2551,27 @@
     // ── Mensal ──
     const tbM  = document.getElementById('tbody-mensal');
     const rowsM = agencias.map(a => {
-      const s     = calcSaldos(a);
-      const badge = a.enviado ? '<span class="badge ok">✅</span>' : '<span class="badge pending">⏳</span>';
-      const dim   = a.enviado ? '' : 'style="color:#bbb"';
+      const s      = calcSaldos(a);
+      const badge  = a.enviado ? '<span class="badge ok">✅</span>' : '<span class="badge pending">⏳</span>';
+      const temSaldo = a.metaVop || a.descInicial || a.quenteInicial || a.arvInicial || a.liqInicial;
+      // Mostra saldos mensais se a agência enviou OU se tem saldos cadastrados no banco
+      const mostraMensal = a.enviado || temSaldo;
+      const dim    = a.enviado ? '' : 'style="opacity:0.7"';
       return `<tr ${dim}>
-        <td class="ag" ${a.enviado?'':'style="color:#bbb;background:#fafafa"'}>${a.agency}</td>
-        <td>${a.enviado ? fmtBRL(a.metaVop)         : dash}</td>
-        <td class="${a.enviado?'auto-val':''}">${a.enviado ? fmtBRL(s.realVop)      : dash}</td>
-        <td>${a.enviado ? fmtBRL(a.descInicial)     : dash}</td>
-        <td class="${a.enviado?'saldo '+cls(s.saldoDesc):''}">${a.enviado ? fmtBRL(s.saldoDesc)   : dash}</td>
-        <td>${a.enviado ? fmtBRL(a.quenteInicial)   : dash}</td>
-        <td class="${a.enviado?'saldo '+cls(s.saldoQuente):''}">${a.enviado ? fmtBRL(s.saldoQuente): dash}</td>
-        <td>${a.enviado ? fmtBRL(a.arvInicial)      : dash}</td>
-        <td class="${a.enviado?'saldo '+cls(s.saldoArv):''}">${a.enviado ? fmtBRL(s.saldoArv)    : dash}</td>
-        <td>${a.enviado ? fmtBRL(a.liqInicial)      : dash}</td>
-        <td class="${a.enviado?'saldo '+cls(s.saldoLiq):''}">${a.enviado ? fmtBRL(s.saldoLiq)    : dash}</td>
-        <td>${a.enviado ? fmtBRL(a.netDiaAnterior||0) : dash}</td>
+        <td class="ag" ${a.enviado?'':'style="background:#fafafa"'}>${a.agency}</td>
+        <td>${mostraMensal ? fmtBRL(a.metaVop)         : dash}</td>
+        <td class="${a.enviado?'auto-val':''}">${a.enviado ? fmtBRL(s.realVop) : dash}</td>
+        <td>${mostraMensal ? fmtBRL(a.descInicial)     : dash}</td>
+        <td class="${mostraMensal?'saldo '+cls(s.saldoDesc):''}">${mostraMensal ? fmtBRL(s.saldoDesc)    : dash}</td>
+        <td>${mostraMensal ? fmtBRL(a.quenteInicial)   : dash}</td>
+        <td class="${mostraMensal?'saldo '+cls(s.saldoQuente):''}">${mostraMensal ? fmtBRL(s.saldoQuente) : dash}</td>
+        <td>${mostraMensal ? fmtBRL(a.arvInicial)      : dash}</td>
+        <td class="${mostraMensal?'saldo '+cls(s.saldoArv):''}">${mostraMensal ? fmtBRL(s.saldoArv)     : dash}</td>
+        <td>${mostraMensal ? fmtBRL(a.liqInicial)      : dash}</td>
+        <td class="${mostraMensal?'saldo '+cls(s.saldoLiq):''}">${mostraMensal ? fmtBRL(s.saldoLiq)     : dash}</td>
+        <td>${a.enviado ? fmtBRL(a.netDiaAnterior||0)  : dash}</td>
         <td class="${a.enviado?'net-acum '+cls(a.netAcumulado):''}">${a.enviado ? fmtBRL(a.netAcumulado) : dash}</td>
-        <td class="${a.enviado?'net-proj '+cls(s.netProj):''}">${a.enviado ? fmtBRL(s.netProj)   : dash}</td>
+        <td class="${mostraMensal?'net-proj '+cls(s.netProj):''}">${mostraMensal ? fmtBRL(s.netProj)    : dash}</td>
         <td style="text-align:center">${badge}</td>
       </tr>`;
     });
