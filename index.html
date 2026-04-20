@@ -807,8 +807,8 @@
   // ═══════════════════════════════════════════════════════
   // ── SUPABASE — BANCO DE DADOS PERSISTENTE ──
   // ═══════════════════════════════════════════════════════
-  const SUPA_URL = 'https://umiwqmslqalanjwupdlh.supabase.co';
-  const SUPA_KEY = 'sb_publishable_JCqMW5zDWeHZdEZ9CtjEhw_bt5fjhyO';
+  const SUPA_URL = 'https://fdefnukjulrhquzmufke.supabase.co';
+  const SUPA_KEY = 'sb_publishable_v8PxB_fIUgVLgT4MoNistQ_OjykbD5O';
 
   function supaHeaders(extra) {
     return Object.assign({
@@ -861,7 +861,7 @@
         {
           method: 'PATCH',
           headers: supaHeaders({ 'Prefer': 'return=representation', 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ valor: value, atualizado_em: new Date().toISOString() })
+          body: JSON.stringify({ valor: value, atualizado_em: new Date().toISOString() })  // PATCH body — sem chave
         }
       );
       if (patch.ok) {
