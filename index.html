@@ -851,40 +851,30 @@
     _saveTimers[key] = setTimeout(() => supaSet(key, _memStore[key]), 300);
   }
 
-  // ── Escreve no Supabase com upsert correto e retry ──
+  // ── Escreve no Supabase com upsert real ──
   async function supaSet(key, value, retries = 3) {
     setDbStatus('syncing', 'Salvando...');
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        // Tenta UPDATE primeiro
-        const upd = await fetch(
-          `${SUPA_URL}/rest/v1/app_storage?chave=eq.${encodeURIComponent(key)}`,
-          {
-            method: 'PATCH',
-            headers: supaHeaders({ 'Prefer': 'return=minimal' }),
-            body: JSON.stringify({ valor: value, atualizado_em: new Date().toISOString() })
-          }
-        );
-        if (upd.ok) {
-          // Se nenhuma linha foi afetada, faz INSERT
-          const count = upd.headers.get('content-range');
-          if (!count || count === '*' || count.startsWith('0')) {
-            const ins = await fetch(`${SUPA_URL}/rest/v1/app_storage`, {
-              method: 'POST',
-              headers: supaHeaders({ 'Prefer': 'return=minimal' }),
-              body: JSON.stringify({ chave: key, valor: value, atualizado_em: new Date().toISOString() })
-            });
-            if (!ins.ok && ins.status !== 409) throw new Error('INSERT ' + ins.status);
-          }
+        const res = await fetch(`${SUPA_URL}/rest/v1/app_storage`, {
+          method: 'POST',
+          headers: supaHeaders({
+            'Prefer': 'resolution=merge-duplicates,return=minimal'
+          }),
+          body: JSON.stringify({ chave: key, valor: value, atualizado_em: new Date().toISOString() })
+        });
+        if (res.ok || res.status === 201) {
           setDbStatus('online', '🟢 Online');
           return;
         }
-        if (upd.status === 429 || upd.status >= 500) {
-          // Rate limit ou erro servidor — aguarda e tenta de novo
+        if (res.status === 429 || res.status >= 500) {
           await new Promise(r => setTimeout(r, attempt * 800));
           continue;
         }
-        throw new Error('PATCH ' + upd.status);
+        // Log do erro real para debug
+        const errText = await res.text().catch(() => '');
+        console.error('supaSet HTTP', res.status, errText);
+        throw new Error('HTTP ' + res.status);
       } catch(e) {
         if (attempt === retries) {
           setDbStatus('offline', '🔴 Offline');
@@ -2081,10 +2071,14 @@
   function showTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    const tabs  = document.querySelectorAll('.tab');
+    const tabs = document.querySelectorAll('.tab');
     if (tab === 'lancamento') {
       tabs[0].classList.add('active');
       document.getElementById('page-lancamento').classList.add('active');
+      // Recarrega dados frescos do banco
+      recarregarBanco().then(() => {
+        if (document.getElementById('agency-select').value) syncNomes();
+      });
     } else if (tab === 'gg') {
       tabs[1].classList.add('active');
       document.getElementById('page-gg').classList.add('active');
@@ -2094,12 +2088,33 @@
         document.getElementById('prod-data').value = today;
       const _dm = document.getElementById('diario-mes');
       if (_dm && !_dm.value) _dm.value = today.slice(0,7);
-      renderProdutividade();
-      renderDiario();
+      // Recarrega dados frescos antes de renderizar
+      recarregarBanco().then(() => {
+        renderProdutividade();
+        renderDiario();
+      });
     } else {
       tabs[2].classList.add('active');
       document.getElementById('page-painel').classList.add('active');
-      carregarPainel();
+      // Recarrega dados frescos antes de renderizar painel
+      recarregarBanco().then(() => carregarPainel());
+    }
+  }
+
+  // Recarrega todos os dados do Supabase sem mostrar o overlay
+  async function recarregarBanco() {
+    try {
+      const res = await fetch(
+        `${SUPA_URL}/rest/v1/app_storage?select=chave,valor`,
+        { headers: supaHeaders() }
+      );
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const rows = await res.json();
+      rows.forEach(r => { _memStore[r.chave] = r.valor; });
+      setDbStatus('online', '🟢 Online');
+    } catch(e) {
+      setDbStatus('offline', '🔴 Offline');
+      console.error('recarregarBanco:', e);
     }
   }
 
