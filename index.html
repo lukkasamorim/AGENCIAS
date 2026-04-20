@@ -270,18 +270,6 @@
   .prod-row-saved { background:#f0fbf7; }
   .prod-row-saved td { color:#0d7a5f; }
 
-  /* ── LOGIN SCREEN ── */
-  #login-screen { position:fixed;inset:0;background:linear-gradient(135deg,#1a3a6e 0%,#0d2550 100%);display:flex;align-items:center;justify-content:center;z-index:99999; }
-  .login-box { background:#fff;border-radius:16px;padding:36px 40px;width:360px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,0.4);text-align:center; }
-  .login-logo { font-size:36px;margin-bottom:8px; }
-  .login-title { font-size:17px;font-weight:700;color:#1a3a6e;margin-bottom:4px; }
-  .login-sub { font-size:12px;color:#888;margin-bottom:24px; }
-  .login-box input[type=password] { width:100%;padding:11px 14px;border:1.5px solid #d0d5e0;border-radius:8px;font-size:14px;outline:none;color:#1a1a2e;margin-bottom:14px;transition:border-color 0.2s; }
-  .login-box input[type=password]:focus { border-color:#1a3a6e; }
-  .login-btn { width:100%;padding:12px;background:#1a3a6e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:background 0.2s; }
-  .login-btn:hover { background:#15306a; }
-  .login-err { color:#b92d2d;font-size:12px;margin-top:8px;min-height:18px;font-weight:600; }
-  .login-saving { font-size:11px;color:#888;margin-top:6px; }
   /* ── LOADING OVERLAY ── */
   #loading-overlay { position:fixed;inset:0;background:rgba(255,255,255,0.85);display:flex;align-items:center;justify-content:center;z-index:9998; }
   .loading-box { text-align:center; }
@@ -304,23 +292,10 @@
 
 
 <!-- ── LOADING OVERLAY ── -->
-<div id="loading-overlay" style="display:none">
+<div id="loading-overlay" style="display:flex">
   <div class="loading-box">
     <div class="ld-spinner"></div>
-    <div class="ld-text">Carregando dados...</div>
-  </div>
-</div>
-
-<!-- ── LOGIN SCREEN ── -->
-<div id="login-screen">
-  <div class="login-box">
-    <div class="login-logo">📊</div>
-    <div class="login-title">Produção Diária — Agências</div>
-    <div class="login-sub">Digite a senha para acessar o sistema</div>
-    <input type="password" id="login-pass" placeholder="Senha" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" onclick="doLogin()">Entrar</button>
-    <div class="login-err" id="login-err"></div>
-    <div class="login-saving" id="login-saving"></div>
+    <div class="ld-text" id="loading-text">Carregando dados...</div>
   </div>
 </div>
 
@@ -830,47 +805,20 @@
 
 <script>
   // ═══════════════════════════════════════════════════════
-  // ── AUTENTICAÇÃO ──
-  // ═══════════════════════════════════════════════════════
-  const APP_PASSWORD = 'regional2025';
-  let appUnlocked = false;
-
-  function doLogin() {
-    const pass = document.getElementById('login-pass').value;
-    if (pass === APP_PASSWORD) {
-      appUnlocked = true;
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('loading-overlay').style.display = 'flex';
-      document.getElementById('login-saving').textContent = '';
-      initApp();
-    } else {
-      document.getElementById('login-err').textContent = '❌ Senha incorreta. Tente novamente.';
-      document.getElementById('login-pass').value = '';
-      document.getElementById('login-pass').focus();
-    }
-  }
-
-  function setDbStatus(status, msg) {
-    const el  = document.getElementById('db-status-indicator');
-    const txt = document.getElementById('db-status-text');
-    if (!el || !txt) return;
-    el.className  = 'db-status ' + status;
-    txt.textContent = msg;
-  }
-
-  // ═══════════════════════════════════════════════════════
   // ── SUPABASE — BANCO DE DADOS PERSISTENTE ──
   // ═══════════════════════════════════════════════════════
-  const SUPA_URL     = 'https://umiwqmslqalanjwupdlh.supabase.co';
-  const SUPA_KEY     = 'sb_publishable_JCqMW5zDWeHZdEZ9CtjEhw_bt5fjhyO';
-  const SUPA_HEADERS = {
-    'Content-Type': 'application/json',
-    'apikey': SUPA_KEY,
-    'Authorization': `Bearer ${SUPA_KEY}`,
-    'Prefer': 'resolution=merge-duplicates'
-  };
+  const SUPA_URL = 'https://umiwqmslqalanjwupdlh.supabase.co';
+  const SUPA_KEY = 'sb_publishable_JCqMW5zDWeHZdEZ9CtjEhw_bt5fjhyO';
 
-  // ── Cache em memória (carregado uma vez no login) ──
+  function supaHeaders(extra) {
+    return Object.assign({
+      'Content-Type': 'application/json',
+      'apikey': SUPA_KEY,
+      'Authorization': `Bearer ${SUPA_KEY}`
+    }, extra || {});
+  }
+
+  // ── Cache em memória ──
   const _memStore = {};
 
   function lsGet(key) {
@@ -878,52 +826,110 @@
   }
   function lsSet(key, value) {
     _memStore[key] = value;
-    supaSet(key, value); // persiste no banco (async, fire-and-forget)
+    supaSet(key, value);
   }
   function lsGetItem(key) { return lsGet(key); }
   function lsSetItem(key, val) { lsSet(key, val); }
 
-  // ── Escreve no Supabase ──
-  async function supaSet(key, value) {
-    try {
-      setDbStatus('syncing', 'Salvando...');
-      const res = await fetch(`${SUPA_URL}/rest/v1/app_storage`, {
-        method: 'POST',
-        headers: SUPA_HEADERS,
-        body: JSON.stringify({ chave: key, valor: value, atualizado_em: new Date().toISOString() })
-      });
-      if (res.ok) {
-        setDbStatus('online', '🟢 Online');
-      } else {
-        setDbStatus('offline', '🔴 Erro ao salvar');
+  // ── Status de conexão ──
+  function setDbStatus(status, msg) {
+    const el  = document.getElementById('db-status-indicator');
+    const txt = document.getElementById('db-status-text');
+    if (!el || !txt) return;
+    el.className    = 'db-status ' + status;
+    txt.textContent = msg;
+  }
+
+  // ── Fila de salvamento (evita sobrecarga de conexões simultâneas) ──
+  const _saveQueue = {};
+  const _saveTimers = {};
+
+  function lsSetQueued(key, value) {
+    _memStore[key] = value;
+    // Debounce: agrupa múltiplas escritas em 300ms numa só chamada
+    clearTimeout(_saveTimers[key]);
+    _saveTimers[key] = setTimeout(() => supaSet(key, _memStore[key]), 300);
+  }
+
+  // ── Escreve no Supabase com upsert correto e retry ──
+  async function supaSet(key, value, retries = 3) {
+    setDbStatus('syncing', 'Salvando...');
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        // Tenta UPDATE primeiro
+        const upd = await fetch(
+          `${SUPA_URL}/rest/v1/app_storage?chave=eq.${encodeURIComponent(key)}`,
+          {
+            method: 'PATCH',
+            headers: supaHeaders({ 'Prefer': 'return=minimal' }),
+            body: JSON.stringify({ valor: value, atualizado_em: new Date().toISOString() })
+          }
+        );
+        if (upd.ok) {
+          // Se nenhuma linha foi afetada, faz INSERT
+          const count = upd.headers.get('content-range');
+          if (!count || count === '*' || count.startsWith('0')) {
+            const ins = await fetch(`${SUPA_URL}/rest/v1/app_storage`, {
+              method: 'POST',
+              headers: supaHeaders({ 'Prefer': 'return=minimal' }),
+              body: JSON.stringify({ chave: key, valor: value, atualizado_em: new Date().toISOString() })
+            });
+            if (!ins.ok && ins.status !== 409) throw new Error('INSERT ' + ins.status);
+          }
+          setDbStatus('online', '🟢 Online');
+          return;
+        }
+        if (upd.status === 429 || upd.status >= 500) {
+          // Rate limit ou erro servidor — aguarda e tenta de novo
+          await new Promise(r => setTimeout(r, attempt * 800));
+          continue;
+        }
+        throw new Error('PATCH ' + upd.status);
+      } catch(e) {
+        if (attempt === retries) {
+          setDbStatus('offline', '🔴 Offline');
+          console.error('supaSet falhou após', retries, 'tentativas:', key, e);
+        } else {
+          await new Promise(r => setTimeout(r, attempt * 600));
+        }
       }
-    } catch(e) {
-      setDbStatus('offline', '🔴 Offline');
-      console.error('supaSet error', key, e);
     }
   }
 
   // ── Carrega TUDO do Supabase na inicialização ──
   async function initApp() {
+    const loadingText = document.getElementById('loading-text');
+    if (loadingText) loadingText.textContent = 'Conectando ao banco de dados...';
     setDbStatus('syncing', 'Conectando...');
-    try {
-      const res = await fetch(`${SUPA_URL}/rest/v1/app_storage?select=chave,valor`, {
-        headers: {
-          'apikey': SUPA_KEY,
-          'Authorization': `Bearer ${SUPA_KEY}`
+    let tentativas = 0;
+    while (tentativas < 3) {
+      try {
+        const res = await fetch(
+          `${SUPA_URL}/rest/v1/app_storage?select=chave,valor&order=atualizado_em.desc`,
+          { headers: supaHeaders() }
+        );
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const rows = await res.json();
+        rows.forEach(r => { _memStore[r.chave] = r.valor; });
+        setDbStatus('online', '🟢 Online');
+        break;
+      } catch(e) {
+        tentativas++;
+        if (tentativas >= 3) {
+          setDbStatus('offline', '🔴 Offline — sem dados do servidor');
+          console.error('initApp falhou:', e);
+        } else {
+          if (loadingText) loadingText.textContent = `Reconectando... (tentativa ${tentativas + 1})`;
+          await new Promise(r => setTimeout(r, tentativas * 1000));
         }
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const rows = await res.json();
-      rows.forEach(r => { _memStore[r.chave] = r.valor; });
-      setDbStatus('online', '🟢 Online');
-    } catch(e) {
-      console.error('initApp Supabase error', e);
-      setDbStatus('offline', '🔴 Offline — dados locais');
+      }
     }
     document.getElementById('loading-overlay').style.display = 'none';
     _initAppUI();
   }
+
+  // Inicia automaticamente ao carregar a página
+  window.addEventListener('DOMContentLoaded', () => initApp());
 
   // ═══════════════════════════════════════════════════════
   // ── Produtividade — Tabela de preenchimento por gerente ──
